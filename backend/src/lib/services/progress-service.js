@@ -1,7 +1,28 @@
 import { connectToDatabase } from "@/lib/db";
-import { NotFoundError } from "@/lib/errors";
+import { BadRequestError, NotFoundError } from "@/lib/errors";
+import { CourseModel } from "@/lib/models/course";
 import { ProgressModel } from "@/lib/models/progress";
 import { countLessons, getCourseById } from "@/lib/services/course-service";
+function getCourseLessonIdSet(course) {
+    const sections = Array.isArray(course.sections) ? course.sections : [];
+    const lessonIds = new Set();
+    for (const section of sections) {
+        const lessons = Array.isArray(section.lessons) ? section.lessons : [];
+        for (const lesson of lessons) {
+            if ((lesson === null || lesson === void 0 ? void 0 : lesson.id) && typeof lesson.id === "string") {
+                lessonIds.add(lesson.id);
+            }
+        }
+    }
+    return lessonIds;
+}
+function ensureLessonBelongsToCourse(course, lessonId) {
+    const lessonIds = getCourseLessonIdSet(course);
+    if (!lessonIds.has(lessonId)) {
+        throw new BadRequestError("Lesson does not belong to this course");
+    }
+    return lessonIds;
+}
 export async function createProgress(userId, courseId) {
     await connectToDatabase();
     const existing = await ProgressModel.findOne({ userId, courseId }).exec();
@@ -50,25 +71,30 @@ export async function getMyLearningCourses(userId) {
     return result;
 }
 export async function markLessonComplete(userId, courseId, lessonId) {
-    var _a;
     await connectToDatabase();
     const progressDoc = await ProgressModel.findOne({ userId, courseId }).exec();
     if (!progressDoc) {
         throw new NotFoundError("Progress not found");
     }
-    const completedLessonIds = (_a = progressDoc.completedLessonIds) !== null && _a !== void 0 ? _a : [];
-    if (!completedLessonIds.includes(lessonId)) {
-        completedLessonIds.push(lessonId);
-    }
-    progressDoc.completedLessonIds = completedLessonIds;
-    progressDoc.currentLessonId = lessonId;
     const course = await getCourseById(courseId);
+    const lessonIds = ensureLessonBelongsToCourse(course, lessonId);
+    const completedLessonIds = Array.isArray(progressDoc.completedLessonIds)
+        ? progressDoc.completedLessonIds.filter((id) => typeof id === "string" && lessonIds.has(id))
+        : [];
+    const completedSet = new Set(completedLessonIds);
+    completedSet.add(lessonId);
+    const normalizedCompletedLessonIds = Array.from(completedSet);
+    progressDoc.completedLessonIds = normalizedCompletedLessonIds;
+    progressDoc.currentLessonId = lessonId;
     const totalLessons = countLessons(course);
-    const completedLessons = completedLessonIds.length;
-    const progressPercent = totalLessons > 0 ? Math.floor((completedLessons * 100) / totalLessons) : 0;
+    const completedLessons = Math.min(normalizedCompletedLessonIds.length, totalLessons);
+    const progressPercent = totalLessons > 0 ? Math.min(100, Math.floor((completedLessons * 100) / totalLessons)) : 0;
     progressDoc.progressPercent = progressPercent;
     if (progressPercent === 100 && !progressDoc.completedAt) {
         progressDoc.completedAt = new Date();
+    }
+    if (progressPercent < 100) {
+        progressDoc.completedAt = null;
     }
     await progressDoc.save();
     return progressDoc.toObject({ virtuals: true });
@@ -79,6 +105,8 @@ export async function updateVideoPosition(userId, courseId, lessonId, position) 
     if (!progressDoc) {
         throw new NotFoundError("Progress not found");
     }
+    const course = await getCourseById(courseId);
+    ensureLessonBelongsToCourse(course, lessonId);
     progressDoc.currentLessonId = lessonId;
     progressDoc.lastVideoPosition = position;
     await progressDoc.save();
@@ -86,40 +114,35 @@ export async function updateVideoPosition(userId, courseId, lessonId, position) 
 }
 async function findProgressByLesson(userId, lessonId) {
     await connectToDatabase();
-    const currentLessonProgress = await ProgressModel.findOne({
+    const progressByCurrentOrCompletedLesson = await ProgressModel.findOne({
         userId,
-        currentLessonId: lessonId,
+        $or: [{ currentLessonId: lessonId }, { completedLessonIds: lessonId }],
     }).exec();
-    if (currentLessonProgress) {
-        return currentLessonProgress.toObject({ virtuals: true });
+    if (progressByCurrentOrCompletedLesson) {
+        return progressByCurrentOrCompletedLesson;
     }
-    const completedLessonProgress = await ProgressModel.findOne({
-        userId,
-        completedLessonIds: lessonId,
+    const course = await CourseModel.findOne({
+        "sections.lessons.id": lessonId,
     }).exec();
-    if (completedLessonProgress) {
-        return completedLessonProgress.toObject({ virtuals: true });
+    if (!course) {
+        return null;
     }
-    return null;
+    return ProgressModel.findOne({ userId, courseId: String(course._id) }).exec();
 }
 export async function getVideoPositionByLesson(userId, lessonId) {
-    var _a;
-    const progress = await findProgressByLesson(userId, lessonId);
-    if (!progress) {
+    const progressDoc = await findProgressByLesson(userId, lessonId);
+    if (!progressDoc) {
         return 0;
     }
-    return Number((_a = progress.lastVideoPosition) !== null && _a !== void 0 ? _a : 0);
+    return Number(progressDoc.lastVideoPosition !== null && progressDoc.lastVideoPosition !== void 0 ? progressDoc.lastVideoPosition : 0);
 }
 export async function updateVideoPositionByLesson(userId, lessonId, position) {
-    await connectToDatabase();
-    const progress = await findProgressByLesson(userId, lessonId);
-    if (!progress) {
-        throw new NotFoundError("Progress not found for lesson");
-    }
-    const progressDoc = await ProgressModel.findById(progress.id).exec();
+    const progressDoc = await findProgressByLesson(userId, lessonId);
     if (!progressDoc) {
         throw new NotFoundError("Progress not found for lesson");
     }
+    const course = await getCourseById(String(progressDoc.courseId));
+    ensureLessonBelongsToCourse(course, lessonId);
     progressDoc.currentLessonId = lessonId;
     progressDoc.lastVideoPosition = position;
     await progressDoc.save();

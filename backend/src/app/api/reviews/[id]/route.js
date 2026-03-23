@@ -1,14 +1,17 @@
 import { requireAuth } from "@/lib/auth";
 import { corsPreflight } from "@/lib/cors";
 import { ok, withErrorHandling } from "@/lib/http";
-import { logoutUser } from "@/lib/services/auth-service";
+import { deleteReviewById } from "@/lib/services/review-service";
+
 export async function OPTIONS(request) {
     return corsPreflight(request);
 }
-export async function POST(request) {
+
+export async function DELETE(request, context) {
     return withErrorHandling(request, async () => {
         const user = await requireAuth(request);
-        await logoutUser(user.id);
-        return ok(request, null, "Logout successful");
+        const { id } = await context.params;
+        const deletedReview = await deleteReviewById(user, id);
+        return ok(request, deletedReview, "Review deleted successfully");
     });
 }

@@ -68,8 +68,13 @@ npm run start
 - `GET /api/courses`
 - `GET /api/courses/featured`
 - `GET /api/courses/categories`
+- `GET /api/categories`
 - `GET /api/courses/{slug}`
 - `GET /api/courses/id/{id}` (admin)
+
+- `POST /api/reviews` (auth, create/update my review)
+- `GET /api/reviews/course/{courseId}`
+- `DELETE /api/reviews/{id}` (owner/admin)
 
 - `POST /api/orders`
 - `GET /api/orders`
@@ -85,9 +90,15 @@ npm run start
 - `POST /api/progress/position/{lessonId}`
 - `PUT /api/progress/{courseId}/video-position`
 
+- `GET /api/upload`
+- `POST /api/upload` (multipart image upload)
+- `DELETE /api/upload/{id}`
+
 - `GET /api/admin/dashboard`
 - `GET/POST /api/admin/courses`
 - `PUT/DELETE /api/admin/courses/{id}`
+- `GET/POST /api/admin/categories`
+- `PUT/DELETE /api/admin/categories/{id}`
 - `GET /api/admin/orders`
 - `PATCH/PUT /api/admin/orders/{id}/status`
 - `GET /api/admin/users`
@@ -98,6 +109,9 @@ npm run start
 - Public course detail masks non-preview lesson `videoUrl`
 - Pagination constraints: `page >= 0`, `1 <= size <= 100`
 - Auth rate-limit responses return HTTP `429` and `Retry-After`
+- Upload supports image mime types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
+- Upload max file size is controlled by `UPLOAD_MAX_FILE_SIZE_BYTES` (default: `5242880`)
+- Review posting requires course access (must be enrolled)
 
 ## Legacy Java Backend
 

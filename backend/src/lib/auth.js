@@ -69,6 +69,9 @@ export async function requireAuth(request) {
         throw new UnauthorizedError();
     }
     const userObj = user.toObject({ virtuals: true });
+    if (userObj.enabled === false) {
+        throw new UnauthorizedError("Account has been disabled");
+    }
     if (userObj.tokenVersion !== claims.tokenVersion) {
         throw new UnauthorizedError("Token has been revoked");
     }

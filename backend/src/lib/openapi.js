@@ -51,8 +51,11 @@ export const openApiDocument = {
   tags: [
     { name: "Auth" },
     { name: "Courses" },
+    { name: "Categories" },
     { name: "Orders" },
     { name: "Progress" },
+    { name: "Reviews" },
+    { name: "Upload" },
     { name: "Admin" },
   ],
   paths: {
@@ -102,6 +105,24 @@ export const openApiDocument = {
         security: authSecurity,
         responses: {
           "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+      put: {
+        tags: ["Auth"],
+        summary: "Update current user profile",
+        security: authSecurity,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateProfileRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse,
+          "400": badRequestResponse,
           "401": unauthorizedResponse,
         },
       },
@@ -229,6 +250,15 @@ export const openApiDocument = {
       get: {
         tags: ["Courses"],
         summary: "Get published categories",
+        responses: {
+          "200": okResponse,
+        },
+      },
+    },
+    "/api/categories": {
+      get: {
+        tags: ["Categories"],
+        summary: "Get active categories",
         responses: {
           "200": okResponse,
         },
@@ -502,6 +532,225 @@ export const openApiDocument = {
         },
       },
     },
+    "/api/reviews": {
+      post: {
+        tags: ["Reviews"],
+        summary: "Create or update my review",
+        security: authSecurity,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReviewRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse,
+          "201": okResponse,
+          "400": badRequestResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+          "404": notFoundResponse,
+        },
+      },
+    },
+    "/api/reviews/course/{courseId}": {
+      get: {
+        tags: ["Reviews"],
+        summary: "Get published reviews by course",
+        parameters: [
+          {
+            in: "path",
+            name: "courseId",
+            required: true,
+            schema: { type: "string" },
+          },
+          { in: "query", name: "page", schema: { type: "integer", minimum: 0, default: 0 } },
+          { in: "query", name: "size", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
+        ],
+        responses: {
+          "200": okResponse,
+          "404": notFoundResponse,
+        },
+      },
+    },
+    "/api/reviews/{id}": {
+      delete: {
+        tags: ["Reviews"],
+        summary: "Delete review by ID",
+        security: authSecurity,
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+          "404": notFoundResponse,
+        },
+      },
+    },
+    "/api/upload": {
+      get: {
+        tags: ["Upload"],
+        summary: "Get my uploaded files",
+        security: authSecurity,
+        parameters: [
+          { in: "query", name: "purpose", schema: { type: "string", enum: ["GENERAL", "AVATAR", "COURSE_THUMBNAIL"] } },
+          { in: "query", name: "page", schema: { type: "integer", minimum: 0, default: 0 } },
+          { in: "query", name: "size", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+      post: {
+        tags: ["Upload"],
+        summary: "Upload image file",
+        security: authSecurity,
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: ["file"],
+                properties: {
+                  file: {
+                    type: "string",
+                    format: "binary",
+                  },
+                  purpose: {
+                    type: "string",
+                    enum: ["GENERAL", "AVATAR", "COURSE_THUMBNAIL"],
+                    default: "GENERAL",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": okResponse,
+          "400": badRequestResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+    },
+    "/api/upload/{id}": {
+      delete: {
+        tags: ["Upload"],
+        summary: "Delete uploaded file",
+        security: authSecurity,
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+          "404": notFoundResponse,
+        },
+      },
+    },
+    "/api/admin/categories": {
+      get: {
+        tags: ["Admin"],
+        summary: "Get admin categories",
+        security: adminSecurity,
+        parameters: [
+          { in: "query", name: "search", schema: { type: "string" } },
+          { in: "query", name: "isActive", schema: { type: "boolean" } },
+          { in: "query", name: "page", schema: { type: "integer", minimum: 0, default: 0 } },
+          { in: "query", name: "size", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+        },
+      },
+      post: {
+        tags: ["Admin"],
+        summary: "Create category",
+        security: adminSecurity,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CategoryRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": okResponse,
+          "400": badRequestResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+        },
+      },
+    },
+    "/api/admin/categories/{id}": {
+      put: {
+        tags: ["Admin"],
+        summary: "Update category",
+        security: adminSecurity,
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CategoryRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse,
+          "400": badRequestResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+          "404": notFoundResponse,
+        },
+      },
+      delete: {
+        tags: ["Admin"],
+        summary: "Delete category",
+        security: adminSecurity,
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+          "403": forbiddenResponse,
+          "404": notFoundResponse,
+        },
+      },
+    },
     "/api/admin/dashboard": {
       get: {
         tags: ["Admin"],
@@ -751,6 +1000,18 @@ export const openApiDocument = {
           newPassword: { type: "string", example: "Bb@123456" },
         },
       },
+      UpdateProfileRequest: {
+        type: "object",
+        required: ["fullName"],
+        properties: {
+          fullName: { type: "string", example: "Nguyen Van B" },
+          avatarUrl: {
+            type: "string",
+            nullable: true,
+            description: "Supports absolute URL (http/https) or root-relative path like /uploads/...",
+          },
+        },
+      },
       CheckoutRequest: {
         type: "object",
         required: ["courseIds", "paymentMethod"],
@@ -796,6 +1057,24 @@ export const openApiDocument = {
           isPublished: { type: "boolean", default: false },
         },
       },
+      CategoryRequest: {
+        type: "object",
+        required: ["name"],
+        properties: {
+          name: { type: "string", example: "Frontend" },
+          description: { type: "string", nullable: true, example: "Client-side development" },
+          isActive: { type: "boolean", default: true },
+        },
+      },
+      ReviewRequest: {
+        type: "object",
+        required: ["courseId", "rating"],
+        properties: {
+          courseId: { type: "string" },
+          rating: { type: "integer", minimum: 1, maximum: 5, example: 5 },
+          comment: { type: "string", nullable: true, example: "Very practical course." },
+        },
+      },
       UpdateOrderStatusRequest: {
         type: "object",
         required: ["status"],
@@ -804,6 +1083,24 @@ export const openApiDocument = {
             type: "string",
             enum: ["PENDING", "COMPLETED", "REFUNDED", "CANCELLED"],
           },
+        },
+      },
+      MediaAsset: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          ownerUserId: { type: "string" },
+          originalName: { type: "string" },
+          mimeType: { type: "string", example: "image/png" },
+          extension: { type: "string", example: "png" },
+          sizeBytes: { type: "number", example: 102400 },
+          relativePath: { type: "string", example: "uploads/general/2026/03/1710000000000-uuid.png" },
+          publicUrl: { type: "string", example: "/uploads/general/2026/03/1710000000000-uuid.png" },
+          purpose: { type: "string", enum: ["GENERAL", "AVATAR", "COURSE_THUMBNAIL"] },
+          status: { type: "string", enum: ["ACTIVE", "DELETED"] },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          deletedAt: { type: "string", format: "date-time", nullable: true },
         },
       },
     },

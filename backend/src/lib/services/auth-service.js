@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { generateJwtToken } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
-import { BadRequestError, InvalidCredentialsError, NotFoundError, } from "@/lib/errors";
+import { BadRequestError, ForbiddenError, InvalidCredentialsError, NotFoundError, } from "@/lib/errors";
 import { PasswordResetTokenModel } from "@/lib/models/password-reset-token";
 import { UserModel } from "@/lib/models/user";
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy";
@@ -31,6 +31,11 @@ function toAuthResponse(user) {
 function ensureStrongPassword(password) {
     if (!isPasswordValid(password)) {
         throw new BadRequestError(PASSWORD_POLICY_MESSAGE);
+    }
+}
+function ensureUserEnabled(user) {
+    if (user.enabled === false) {
+        throw new ForbiddenError("Account has been disabled");
     }
 }
 function hashResetToken(token) {
@@ -110,6 +115,7 @@ export async function loginUser(input) {
     if (!matched) {
         throw new InvalidCredentialsError();
     }
+    ensureUserEnabled(user);
     const userObj = user.toObject({ virtuals: true });
     return toAuthResponse({
         id: userObj.id,
@@ -213,6 +219,17 @@ export async function changePassword(userId, input) {
     user.tokenVersion = Number((_a = user.tokenVersion) !== null && _a !== void 0 ? _a : 0) + 1;
     await user.save();
     await invalidateActiveTokens(userId);
+}
+export async function logoutUser(userId) {
+    await connectToDatabase();
+    const update = await UserModel.updateOne({ _id: userId }, {
+        $inc: {
+            tokenVersion: 1,
+        },
+    }).exec();
+    if (update.matchedCount === 0) {
+        throw new NotFoundError("User not found");
+    }
 }
 export function getForgotPasswordResponse(resetToken) {
     const response = {

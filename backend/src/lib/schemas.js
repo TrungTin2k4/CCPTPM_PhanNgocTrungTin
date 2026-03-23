@@ -33,6 +33,7 @@ export const updateProfileSchema = z.object({
     fullName: z.string().trim().min(1, "Full name is required"),
     avatarUrl: z.union([
         z.string().trim().url("Avatar URL must be a valid URL"),
+        z.string().trim().regex(/^\/(?!\/)[^\s]*$/, "Avatar URL must be a valid URL or root-relative path"),
         z.literal(""),
         z.null(),
     ]).optional(),
@@ -58,6 +59,16 @@ export const courseSchema = z.object({
     originalPrice: z.number().optional().nullable(),
     isPublished: z.boolean().optional(),
     sections: z.array(sectionSchema).optional(),
+});
+export const categorySchema = z.object({
+    name: z.string().trim().min(1, "Category name is required"),
+    description: z.string().optional().nullable(),
+    isActive: z.boolean().optional(),
+});
+export const reviewSchema = z.object({
+    courseId: z.string().trim().min(1, "Course ID is required"),
+    rating: z.number({ message: "Rating is required" }).int().min(1, "Rating must be between 1 and 5").max(5, "Rating must be between 1 and 5"),
+    comment: z.string().optional().nullable(),
 });
 export const checkoutSchema = z.object({
     courseIds: z.array(z.string().trim().min(1, "Course ID is required")).min(1, "Course IDs cannot be empty"),

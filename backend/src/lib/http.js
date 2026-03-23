@@ -28,6 +28,12 @@ function buildErrorPayload(message, data) {
         timestamp: new Date().toISOString(),
     };
 }
+function isMongooseCastError(error) {
+    return Boolean(error &&
+        typeof error === "object" &&
+        "name" in error &&
+        error.name === "CastError");
+}
 function makeJsonResponse(request, payload, status, extraHeaders) {
     const headers = buildCorsHeaders(request);
     if (extraHeaders) {
@@ -55,6 +61,9 @@ export function handleError(request, error) {
     }
     if (error instanceof AppError) {
         return fail(request, error.status, error.message, error.data, error.headers);
+    }
+    if (isMongooseCastError(error)) {
+        return fail(request, 400, "Invalid request parameters");
     }
     if (error instanceof SyntaxError) {
         return fail(request, 400, "Invalid request body");

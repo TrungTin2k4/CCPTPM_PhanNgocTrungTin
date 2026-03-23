@@ -117,42 +117,45 @@ export async function getAllOrders(params) {
     };
 }
 async function grantCourseAccess(order) {
-    var _a, _b;
-    const user = await UserModel.findById(order.userId).exec();
-    if (!user) {
+    var _a;
+    const userId = String(order.userId);
+    const existedUser = await UserModel.exists({ _id: userId });
+    if (!existedUser) {
         throw new NotFoundError("User not found");
     }
-    const enrolledCourseIds = Array.isArray(user.enrolledCourseIds)
-        ? user.enrolledCourseIds.filter((courseId) => typeof courseId === "string")
-        : [];
-    const enrolled = new Set(enrolledCourseIds);
-    const newlyEnrolledCourseIds = [];
-    for (const item of (_a = order.items) !== null && _a !== void 0 ? _a : []) {
-        if ((item === null || item === void 0 ? void 0 : item.courseId) && !enrolled.has(item.courseId)) {
-            enrolled.add(item.courseId);
-            newlyEnrolledCourseIds.push(item.courseId);
-        }
-    }
-    if (newlyEnrolledCourseIds.length === 0) {
+    const orderedCourseIds = Array.from(new Set(((_a = order.items) !== null && _a !== void 0 ? _a : [])
+        .map((item) => { var _a; return ((_a = item === null || item === void 0 ? void 0 : item.courseId) !== null && _a !== void 0 ? _a : "").trim(); })
+        .filter((courseId) => courseId.length > 0)));
+    if (orderedCourseIds.length === 0) {
         return;
     }
-    const courses = await getCoursesByIds(newlyEnrolledCourseIds);
+    const courses = await getCoursesByIds(orderedCourseIds);
     const courseMap = new Map(courses.map((course) => [course.id, course]));
-    const missing = newlyEnrolledCourseIds.filter((courseId) => !courseMap.has(courseId));
+    const missing = orderedCourseIds.filter((courseId) => !courseMap.has(courseId));
     if (missing.length > 0) {
         throw new BadRequestError(`Cannot complete order because some courses no longer exist: ${missing.join(", ")}`);
     }
-    for (const course of courses) {
-        await CourseModel.updateOne({ _id: course.id }, {
-            $set: {
-                studentsCount: Number((_b = course.studentsCount) !== null && _b !== void 0 ? _b : 0) + 1,
+    const newlyEnrolledCourseIds = [];
+    for (const courseId of orderedCourseIds) {
+        const updatedUser = await UserModel.updateOne({
+            _id: userId,
+            enrolledCourseIds: { $ne: courseId },
+        }, {
+            $addToSet: {
+                enrolledCourseIds: courseId,
             },
         }).exec();
+        if (updatedUser.modifiedCount > 0) {
+            newlyEnrolledCourseIds.push(courseId);
+        }
     }
-    user.enrolledCourseIds = Array.from(enrolled);
-    await user.save();
     for (const courseId of newlyEnrolledCourseIds) {
-        await createProgress(user.id, courseId);
+        await CourseModel.updateOne({ _id: courseId }, {
+            $inc: {
+                studentsCount: 1,
+            },
+        }).exec();
+        await createProgress(userId, courseId);
     }
 }
 export async function updateOrderStatus(orderId, statusInput) {

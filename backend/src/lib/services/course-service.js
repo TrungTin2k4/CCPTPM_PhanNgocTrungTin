@@ -2,7 +2,7 @@ import { connectToDatabase } from "@/lib/db";
 import { BadRequestError, NotFoundError } from "@/lib/errors";
 import { CourseModel } from "@/lib/models/course";
 import { sanitizeHttpUrl, sanitizePlainText } from "@/lib/sanitizer";
-import { generateEntityId, generateSlugFromTitle, normalizeText } from "@/lib/utils";
+import { escapeRegex, generateEntityId, generateSlugFromTitle, normalizeText } from "@/lib/utils";
 const DEFAULT_SORT = { createdAt: -1 };
 function toCourseSummary(course) {
     return {
@@ -146,10 +146,10 @@ export async function getPublishedCourses(params) {
     const hasSearch = Boolean(searchFilter);
     const filter = { status: "PUBLISHED" };
     if (hasCategory) {
-        filter.category = { $regex: `^${categoryFilter}$`, $options: "i" };
+        filter.category = { $regex: `^${escapeRegex(categoryFilter)}$`, $options: "i" };
     }
     if (hasSearch) {
-        filter.title = { $regex: searchFilter, $options: "i" };
+        filter.title = { $regex: escapeRegex(searchFilter), $options: "i" };
     }
     const [totalItems, docs] = await Promise.all([
         CourseModel.countDocuments(filter).exec(),
@@ -235,10 +235,10 @@ export async function getAllCoursesForAdmin(params) {
         filter.status = status;
     }
     if (category) {
-        filter.category = { $regex: `^${category}$`, $options: "i" };
+        filter.category = { $regex: `^${escapeRegex(category)}$`, $options: "i" };
     }
     if (search) {
-        filter.title = { $regex: search, $options: "i" };
+        filter.title = { $regex: escapeRegex(search), $options: "i" };
     }
     const [totalItems, docs] = await Promise.all([
         CourseModel.countDocuments(filter).exec(),
@@ -265,7 +265,7 @@ export async function createCourse(input) {
         title,
         slug: generateSlugFromTitle(title),
         description: optionalText(input.description),
-        thumbnail: sanitizeHttpUrl(input.thumbnail, "thumbnail"),
+        thumbnail: sanitizeHttpUrl(input.thumbnail, "thumbnail", { allowRelativePath: true }),
         category: optionalText(input.category),
         level: (_a = optionalText(input.level)) !== null && _a !== void 0 ? _a : "beginner",
         instructor: optionalText(input.instructor),
@@ -286,7 +286,7 @@ export async function updateCourse(id, input) {
     }
     course.title = requiredText(input.title, "Title is required");
     course.description = optionalText(input.description);
-    course.thumbnail = sanitizeHttpUrl(input.thumbnail, "thumbnail");
+    course.thumbnail = sanitizeHttpUrl(input.thumbnail, "thumbnail", { allowRelativePath: true });
     course.category = optionalText(input.category);
     course.level = (_a = optionalText(input.level)) !== null && _a !== void 0 ? _a : "beginner";
     course.instructor = optionalText(input.instructor);
