@@ -12,7 +12,7 @@ export async function POST(request) {
         enforceAuthRateLimit(request);
         const body = await parseJsonBody(request);
         const input = validateBody(loginSchema, body);
-        const auth = await loginUser(input);
+        const auth = await loginUser(input, request);
         return ok(request, auth, "Login successful");
     });
 }

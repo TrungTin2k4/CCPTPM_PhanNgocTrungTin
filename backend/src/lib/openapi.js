@@ -52,6 +52,8 @@ export const openApiDocument = {
     { name: "Auth" },
     { name: "Courses" },
     { name: "Categories" },
+    { name: "Cart" },
+    { name: "Enrollments" },
     { name: "Orders" },
     { name: "Progress" },
     { name: "Reviews" },
@@ -197,6 +199,50 @@ export const openApiDocument = {
         },
       },
     },
+    "/api/auth/sessions": {
+      get: {
+        tags: ["Auth"],
+        summary: "Get my login sessions",
+        security: authSecurity,
+        parameters: [
+          { in: "query", name: "page", schema: { type: "integer", minimum: 0, default: 0 } },
+          { in: "query", name: "size", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+      delete: {
+        tags: ["Auth"],
+        summary: "Revoke all my sessions",
+        security: authSecurity,
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+    },
+    "/api/auth/sessions/{id}": {
+      delete: {
+        tags: ["Auth"],
+        summary: "Revoke one session",
+        security: authSecurity,
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+          "404": notFoundResponse,
+        },
+      },
+    },
     "/api/courses": {
       get: {
         tags: ["Courses"],
@@ -300,6 +346,81 @@ export const openApiDocument = {
           "401": unauthorizedResponse,
           "403": forbiddenResponse,
           "404": notFoundResponse,
+        },
+      },
+    },
+    "/api/cart": {
+      get: {
+        tags: ["Cart"],
+        summary: "Get my cart",
+        security: authSecurity,
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+      delete: {
+        tags: ["Cart"],
+        summary: "Clear my cart",
+        security: authSecurity,
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+    },
+    "/api/cart/items": {
+      post: {
+        tags: ["Cart"],
+        summary: "Add course to my cart",
+        security: authSecurity,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CartItemRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse,
+          "400": badRequestResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+    },
+    "/api/cart/items/{courseId}": {
+      delete: {
+        tags: ["Cart"],
+        summary: "Remove course from my cart",
+        security: authSecurity,
+        parameters: [
+          {
+            in: "path",
+            name: "courseId",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
+        },
+      },
+    },
+    "/api/enrollments/me": {
+      get: {
+        tags: ["Enrollments"],
+        summary: "Get my enrollments",
+        security: authSecurity,
+        parameters: [
+          { in: "query", name: "status", schema: { type: "string", enum: ["ACTIVE", "REVOKED"] } },
+          { in: "query", name: "page", schema: { type: "integer", minimum: 0, default: 0 } },
+          { in: "query", name: "size", schema: { type: "integer", minimum: 1, maximum: 100, default: 10 } },
+        ],
+        responses: {
+          "200": okResponse,
+          "401": unauthorizedResponse,
         },
       },
     },
@@ -1073,6 +1194,13 @@ export const openApiDocument = {
           courseId: { type: "string" },
           rating: { type: "integer", minimum: 1, maximum: 5, example: 5 },
           comment: { type: "string", nullable: true, example: "Very practical course." },
+        },
+      },
+      CartItemRequest: {
+        type: "object",
+        required: ["courseId"],
+        properties: {
+          courseId: { type: "string" },
         },
       },
       UpdateOrderStatusRequest: {

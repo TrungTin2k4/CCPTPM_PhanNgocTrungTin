@@ -88,7 +88,7 @@ async function main() {
   });
   expect(register.status === 200, "register user", register);
   const registerData = dataOf(register);
-  const userToken = registerData?.token ?? null;
+  let userToken = registerData?.token ?? null;
   expect(typeof userToken === "string" && userToken.length > 20, "register returns JWT token", registerData);
 
   const login = await api("/api/auth/login", {
@@ -101,11 +101,27 @@ async function main() {
   expect(login.status === 200, "login user", login);
   const loginData = dataOf(login);
   expect(typeof loginData?.token === "string", "login returns JWT token", loginData);
+  userToken = loginData?.token ?? userToken;
 
   const me = await api("/api/auth/me", {
     token: userToken,
   });
   expect(me.status === 200, "get current profile", me);
+
+  const mySessions = await api("/api/auth/sessions?page=0&size=10", {
+    token: userToken,
+  });
+  expect(mySessions.status === 200, "list my sessions", mySessions);
+  const sessionList = dataOf(mySessions)?.sessions ?? [];
+  expect(sessionList.length >= 1, "session list returns at least one active session", sessionList);
+  if (sessionList.length > 1) {
+    const oldestSession = sessionList[sessionList.length - 1];
+    const revokeSession = await api(`/api/auth/sessions/${oldestSession.id}`, {
+      method: "DELETE",
+      token: userToken,
+    });
+    expect(revokeSession.status === 200, "revoke one older session", revokeSession);
+  }
 
   const courses = await api("/api/courses?page=0&size=1");
   expect(courses.status === 200, "list published courses", courses);
@@ -117,6 +133,39 @@ async function main() {
   const detailData = dataOf(courseDetail);
   const firstLessonId = detailData?.sections?.[0]?.lessons?.[0]?.id ?? null;
   expect(typeof firstLessonId === "string", "course detail contains lesson id", detailData);
+
+  const cartBefore = await api("/api/cart", {
+    token: userToken,
+  });
+  expect(cartBefore.status === 200, "get my cart", cartBefore);
+
+  const addToCart = await api("/api/cart/items", {
+    method: "POST",
+    token: userToken,
+    body: {
+      courseId: firstCourse.id,
+    },
+  });
+  expect(addToCart.status === 200, "add course to cart", addToCart);
+
+  const cartAfterAdd = await api("/api/cart", {
+    token: userToken,
+  });
+  expect(cartAfterAdd.status === 200, "get cart after add", cartAfterAdd);
+  const cartAfterAddItems = dataOf(cartAfterAdd)?.items ?? [];
+  expect(cartAfterAddItems.some((item) => item.courseId === firstCourse.id), "cart contains selected course", cartAfterAddItems);
+
+  const removeFromCart = await api(`/api/cart/items/${firstCourse.id}`, {
+    method: "DELETE",
+    token: userToken,
+  });
+  expect(removeFromCart.status === 200, "remove course from cart", removeFromCart);
+
+  const clearCart = await api("/api/cart", {
+    method: "DELETE",
+    token: userToken,
+  });
+  expect(clearCart.status === 200, "clear cart endpoint works", clearCart);
 
   const uploadForm = new FormData();
   uploadForm.append("purpose", "AVATAR");
@@ -211,6 +260,13 @@ async function main() {
     },
   });
   expect(completeOrder.status === 200, "admin completes order", completeOrder);
+
+  const myEnrollments = await api("/api/enrollments/me?page=0&size=10", {
+    token: userToken,
+  });
+  expect(myEnrollments.status === 200, "get my enrollments", myEnrollments);
+  const enrollmentList = dataOf(myEnrollments)?.enrollments ?? [];
+  expect(enrollmentList.some((enrollment) => enrollment.courseId === firstCourse.id), "new enrollment appears after completed order", enrollmentList);
 
   const createReview = await api("/api/reviews", {
     method: "POST",

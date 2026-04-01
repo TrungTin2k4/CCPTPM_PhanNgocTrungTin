@@ -1,8 +1,10 @@
 import { connectToDatabase } from "@/lib/db";
 import { BadRequestError, ForbiddenError, NotFoundError, } from "@/lib/errors";
 import { CourseModel } from "@/lib/models/course";
+import { EnrollmentModel } from "@/lib/models/enrollment";
 import { OrderModel } from "@/lib/models/order";
 import { UserModel } from "@/lib/models/user";
+import { createOrActivateEnrollment } from "@/lib/services/enrollment-service";
 import { createProgress } from "@/lib/services/progress-service";
 import { getCoursesByIds, getPublishedCoursesByIds, } from "@/lib/services/course-service";
 const SUPPORTED_PAYMENT_METHODS = "CARD, MOMO, BANK_TRANSFER";
@@ -52,7 +54,18 @@ export async function checkout(userId, input) {
         throw new BadRequestError(`Some courses are unavailable or not published: ${missingCourseIds.join(", ")}`);
     }
     const enrolledCourseIds = (_a = user.enrolledCourseIds) !== null && _a !== void 0 ? _a : [];
-    const alreadyEnrolledCourseIds = courseIds.filter((courseId) => enrolledCourseIds.includes(courseId));
+    const activeEnrollments = await EnrollmentModel.find({
+        userId,
+        courseId: { $in: courseIds },
+        status: "ACTIVE",
+    })
+        .select({ courseId: 1 })
+        .exec();
+    const activeEnrollmentCourseIds = activeEnrollments
+        .map((enrollment) => enrollment.courseId)
+        .filter((courseId) => typeof courseId === "string");
+    const alreadyEnrolledSet = new Set([...enrolledCourseIds, ...activeEnrollmentCourseIds]);
+    const alreadyEnrolledCourseIds = courseIds.filter((courseId) => alreadyEnrolledSet.has(courseId));
     if (alreadyEnrolledCourseIds.length > 0) {
         throw new BadRequestError(`You are already enrolled in: ${alreadyEnrolledCourseIds.join(", ")}`);
     }
@@ -149,12 +162,19 @@ async function grantCourseAccess(order) {
             newlyEnrolledCourseIds.push(courseId);
         }
     }
+    const orderId = order.id ? String(order.id) : null;
     for (const courseId of newlyEnrolledCourseIds) {
         await CourseModel.updateOne({ _id: courseId }, {
             $inc: {
                 studentsCount: 1,
             },
         }).exec();
+        await createOrActivateEnrollment({
+            userId,
+            courseId,
+            orderId,
+            source: "ORDER",
+        });
         await createProgress(userId, courseId);
     }
 }

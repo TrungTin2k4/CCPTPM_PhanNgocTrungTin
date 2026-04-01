@@ -6,15 +6,22 @@ import { BadRequestError, ForbiddenError, InvalidCredentialsError, NotFoundError
 import { PasswordResetTokenModel } from "@/lib/models/password-reset-token";
 import { UserModel } from "@/lib/models/user";
 import { isPasswordValid, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy";
+import { createUserSession, revokeAllUserSessions } from "@/lib/services/user-session-service";
 function normalizeEmail(email) {
     return email.trim().toLowerCase();
 }
-function toAuthResponse(user) {
+async function toAuthResponse(user, request) {
     var _a;
     const token = generateJwtToken({
         id: user.id,
         email: user.email,
         tokenVersion: user.tokenVersion,
+    });
+    await createUserSession({
+        userId: user.id,
+        token,
+        tokenVersion: user.tokenVersion,
+        request,
     });
     return {
         token,
@@ -79,7 +86,7 @@ async function invalidateActiveTokens(userId, keepTokenId) {
         },
     }).exec();
 }
-export async function registerUser(input) {
+export async function registerUser(input, request) {
     await connectToDatabase();
     ensureStrongPassword(input.password);
     const email = normalizeEmail(input.email);
@@ -102,9 +109,9 @@ export async function registerUser(input) {
         role: userObj.role,
         avatarUrl: userObj.avatarUrl,
         tokenVersion: userObj.tokenVersion,
-    });
+    }, request);
 }
-export async function loginUser(input) {
+export async function loginUser(input, request) {
     await connectToDatabase();
     const email = normalizeEmail(input.email);
     const user = await UserModel.findOne({ email }).exec();
@@ -124,7 +131,7 @@ export async function loginUser(input) {
         role: userObj.role,
         avatarUrl: userObj.avatarUrl,
         tokenVersion: userObj.tokenVersion,
-    });
+    }, request);
 }
 export async function getCurrentUserProfile(userId) {
     var _a;
@@ -198,6 +205,7 @@ export async function resetPassword(input) {
     await resetToken.save();
     const tokenObj = resetToken.toObject({ virtuals: true });
     await invalidateActiveTokens(String(resetToken.userId), tokenObj.id);
+    await revokeAllUserSessions(String(resetToken.userId), "Password reset");
 }
 export async function changePassword(userId, input) {
     var _a;
@@ -219,6 +227,7 @@ export async function changePassword(userId, input) {
     user.tokenVersion = Number((_a = user.tokenVersion) !== null && _a !== void 0 ? _a : 0) + 1;
     await user.save();
     await invalidateActiveTokens(userId);
+    await revokeAllUserSessions(userId, "Password changed");
 }
 export async function logoutUser(userId) {
     await connectToDatabase();
@@ -230,6 +239,7 @@ export async function logoutUser(userId) {
     if (update.matchedCount === 0) {
         throw new NotFoundError("User not found");
     }
+    await revokeAllUserSessions(userId, "User logout");
 }
 export function getForgotPasswordResponse(resetToken) {
     const response = {

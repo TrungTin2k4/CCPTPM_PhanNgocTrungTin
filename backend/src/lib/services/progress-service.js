@@ -3,6 +3,7 @@ import { BadRequestError, NotFoundError } from "@/lib/errors";
 import { CourseModel } from "@/lib/models/course";
 import { ProgressModel } from "@/lib/models/progress";
 import { countLessons, getCourseById } from "@/lib/services/course-service";
+import { hasActiveEnrollment } from "@/lib/services/enrollment-service";
 function getCourseLessonIdSet(course) {
     const sections = Array.isArray(course.sections) ? course.sections : [];
     const lessonIds = new Set();
@@ -150,6 +151,9 @@ export async function updateVideoPositionByLesson(userId, lessonId, position) {
 }
 export async function hasAccess(userId, courseId) {
     await connectToDatabase();
-    const existed = await ProgressModel.exists({ userId, courseId });
-    return Boolean(existed);
+    const [progressExisted, enrollmentExisted] = await Promise.all([
+        ProgressModel.exists({ userId, courseId }),
+        hasActiveEnrollment(userId, courseId),
+    ]);
+    return Boolean(progressExisted) || Boolean(enrollmentExisted);
 }

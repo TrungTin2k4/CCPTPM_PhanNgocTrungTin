@@ -64,6 +64,8 @@ npm run start
 - `POST /api/auth/forgot-password`
 - `POST /api/auth/reset-password`
 - `PUT /api/auth/change-password`
+- `GET/DELETE /api/auth/sessions`
+- `DELETE /api/auth/sessions/{id}`
 
 - `GET /api/courses`
 - `GET /api/courses/featured`
@@ -80,6 +82,12 @@ npm run start
 - `GET /api/orders`
 - `GET /api/orders/me`
 - `GET /api/orders/{orderId}`
+
+- `GET/DELETE /api/cart`
+- `POST /api/cart/items`
+- `DELETE /api/cart/items/{courseId}`
+
+- `GET /api/enrollments/me`
 
 - `GET /api/progress/my-learning`
 - `GET /api/progress/courses`
@@ -112,6 +120,7 @@ npm run start
 - Upload supports image mime types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
 - Upload max file size is controlled by `UPLOAD_MAX_FILE_SIZE_BYTES` (default: `5242880`)
 - Review posting requires course access (must be enrolled)
+- Session management is token-based (`/api/auth/sessions`) and logout revokes active sessions
 
 ## Legacy Java Backend
 

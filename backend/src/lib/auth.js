@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/lib/db";
 import { ForbiddenError, UnauthorizedError } from "@/lib/errors";
 import { UserModel } from "@/lib/models/user";
+import { findActiveUserSessionByToken, touchSessionById } from "@/lib/services/user-session-service";
 function getJwtSecret() {
     const secret = process.env.JWT_SECRET;
     if (!secret || secret.trim().length < 32) {
@@ -75,7 +76,15 @@ export async function requireAuth(request) {
     if (userObj.tokenVersion !== claims.tokenVersion) {
         throw new UnauthorizedError("Token has been revoked");
     }
-    return userObj;
+    const session = await findActiveUserSessionByToken(userObj.id, token);
+    if (!session) {
+        throw new UnauthorizedError("Session is no longer active");
+    }
+    await touchSessionById(session.id);
+    return {
+        ...userObj,
+        sessionId: session.id,
+    };
 }
 export async function requireAdmin(request) {
     const user = await requireAuth(request);

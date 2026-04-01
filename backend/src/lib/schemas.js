@@ -70,6 +70,9 @@ export const reviewSchema = z.object({
     rating: z.number({ message: "Rating is required" }).int().min(1, "Rating must be between 1 and 5").max(5, "Rating must be between 1 and 5"),
     comment: z.string().optional().nullable(),
 });
+export const cartItemSchema = z.object({
+    courseId: z.string().trim().min(1, "Course ID is required"),
+});
 export const checkoutSchema = z.object({
     courseIds: z.array(z.string().trim().min(1, "Course ID is required")).min(1, "Course IDs cannot be empty"),
     paymentMethod: z.string().trim().min(1, "Payment method is required"),
