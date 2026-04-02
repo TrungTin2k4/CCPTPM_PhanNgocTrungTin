@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 :root {
-  --font-display: 'Fraunces', Georgia, serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
 
   --color-canvas: #f4efe6;
@@ -128,25 +128,25 @@
   .type-display-3xl {
     font-family: var(--font-display);
     font-size: clamp(2.85rem, 2.1rem + 2vw, 4rem);
-    line-height: 1.1;
-    letter-spacing: -0.04em;
-    font-weight: 600;
+    line-height: 1.16;
+    letter-spacing: -0.025em;
+    font-weight: 800;
   }
 
   .type-display-2xl {
     font-family: var(--font-display);
     font-size: clamp(2.15rem, 1.75rem + 1.2vw, 2.75rem);
-    line-height: 1.12;
-    letter-spacing: -0.035em;
-    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 800;
   }
 
   .type-display-compact {
     font-family: var(--font-display);
     font-size: clamp(2rem, 1.8rem + 0.7vw, 2.6rem);
-    line-height: 1.04;
-    letter-spacing: -0.035em;
-    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-weight: 800;
   }
 
   .type-title-lg {
@@ -235,7 +235,7 @@
   }
 
 .brand-mark {
-  @apply inline-flex items-center gap-3;
+  @apply inline-flex shrink-0 items-center gap-3;
 }
 
 .brand-mark-logo {
@@ -282,7 +282,7 @@
   }
 
   .avatar-trigger-name {
-    @apply text-sm font-semibold;
+    @apply max-w-[8rem] truncate whitespace-nowrap text-sm font-semibold;
     color: var(--color-ink-950);
   }
 
@@ -327,7 +327,7 @@
   }
 
   .search-shell {
-    @apply flex min-h-[54px] w-full items-center gap-3 rounded-full border bg-white px-5 lg:max-w-[32rem];
+    @apply flex min-h-[54px] w-full min-w-0 items-center gap-3 rounded-full border bg-white px-5 lg:min-w-[12rem] lg:flex-1 lg:max-w-[32rem];
     border-color: var(--color-line);
   }
 

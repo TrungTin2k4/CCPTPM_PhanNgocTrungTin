@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getCourseDetailRequest } from '../api/courses'
+import { getMyLearningRequest } from '../api/progress'
+import { deleteReviewRequest, getCourseReviewsRequest, upsertReviewRequest } from '../api/reviews'
 import FeedbackMessage from '../components/common/FeedbackMessage.jsx'
 import PageHero from '../components/common/PageHero.jsx'
 import { buildCourseCardModel, formatPrice } from '../lib/courseUi'
@@ -14,9 +16,17 @@ function CourseDetailPage() {
   const user = useAuthStore((state) => state.user)
   const addCourse = useCartStore((state) => state.addCourse)
   const [course, setCourse] = useState(null)
+  const [reviews, setReviews] = useState([])
+  const [reviewsTotal, setReviewsTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [notice, setNotice] = useState('')
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState('')
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [reviewMessage, setReviewMessage] = useState('')
+  const [reviewError, setReviewError] = useState('')
+  const [hasLearningAccess, setHasLearningAccess] = useState(false)
 
   useEffect(() => {
     async function loadCourse() {
@@ -36,6 +46,44 @@ function CourseDetailPage() {
     loadCourse()
   }, [slug])
 
+  useEffect(() => {
+    if (!course?.id) {
+      return
+    }
+
+    async function loadReviews() {
+      try {
+        const data = await getCourseReviewsRequest(course.id, { page: 0, size: 6 })
+        setReviews(data?.reviews ?? [])
+        setReviewsTotal(data?.totalItems ?? 0)
+      } catch {
+        setReviews([])
+        setReviewsTotal(0)
+      }
+    }
+
+    loadReviews()
+  }, [course?.id])
+
+  useEffect(() => {
+    if (!token || !course?.id || user?.role === 'ADMIN') {
+      setHasLearningAccess(false)
+      return
+    }
+
+    async function checkAccess() {
+      try {
+        const learningCourses = await getMyLearningRequest()
+        const canLearn = (learningCourses ?? []).some((item) => item.id === course.id || item.slug === course.slug)
+        setHasLearningAccess(canLearn)
+      } catch {
+        setHasLearningAccess(false)
+      }
+    }
+
+    checkAccess()
+  }, [course?.id, course?.slug, token, user?.role])
+
   const cardModel = useMemo(() => {
     if (!course) {
       return null
@@ -49,31 +97,92 @@ function CourseDetailPage() {
   }, [course])
 
   const isAdmin = user?.role === 'ADMIN'
+  const canManageReview = (review) => user && (user.role === 'ADMIN' || user.id === review.userId)
 
-  function handleAddToCart() {
+  async function handleAddToCart() {
     if (!course) {
       return
     }
 
-    const added = addCourse({
-      id: course.id,
-      slug: course.slug,
-      title: course.title,
-      price: course.price,
-      category: course.category,
-    })
+    try {
+      const added = await addCourse(
+        {
+          id: course.id,
+          slug: course.slug,
+          title: course.title,
+          price: course.price,
+          category: course.category,
+        },
+        token,
+      )
 
-    setNotice(added ? 'The course was added to checkout.' : 'This course is already in checkout.')
+      setNotice(added ? 'The course was added to checkout.' : 'This course is already in checkout.')
+    } catch (error) {
+      setNotice(error.message)
+    }
   }
 
-  function handleBuyNow() {
-    handleAddToCart()
+  async function handleBuyNow() {
+    await handleAddToCart()
     if (!token) {
       navigate('/login', { state: { from: '/checkout' } })
       return
     }
 
     navigate('/checkout')
+  }
+
+  async function refreshCourseAndReviews() {
+    if (!course?.id) {
+      return
+    }
+
+    const [nextCourse, nextReviews] = await Promise.all([
+      getCourseDetailRequest(slug),
+      getCourseReviewsRequest(course.id, { page: 0, size: 6 }),
+    ])
+
+    setCourse(nextCourse)
+    setReviews(nextReviews?.reviews ?? [])
+    setReviewsTotal(nextReviews?.totalItems ?? 0)
+  }
+
+  async function handleSubmitReview(event) {
+    event.preventDefault()
+    if (!course?.id) {
+      return
+    }
+
+    setReviewSubmitting(true)
+    setReviewMessage('')
+    setReviewError('')
+
+    try {
+      await upsertReviewRequest({
+        courseId: course.id,
+        rating: Number(reviewRating),
+        comment: reviewComment,
+      })
+      setReviewMessage('Your review was saved successfully.')
+      await refreshCourseAndReviews()
+    } catch (error) {
+      setReviewError(error.message)
+    } finally {
+      setReviewSubmitting(false)
+    }
+  }
+
+  async function handleDeleteReview(reviewId) {
+    setReviewMessage('')
+    setReviewError('')
+
+    try {
+      await deleteReviewRequest(reviewId)
+      setReviewMessage('Review deleted successfully.')
+      await refreshCourseAndReviews()
+    } catch (error) {
+      setReviewError(error.message)
+    }
   }
 
   if (loading) {
@@ -111,9 +220,9 @@ function CourseDetailPage() {
 
             <FeedbackMessage type="success">{notice}</FeedbackMessage>
 
-              <div className="space-y-4">
-                <h2 className="type-display-2xl text-ink-950">Curriculum overview</h2>
-                <div className="curriculum-list">
+            <div className="space-y-4">
+              <h2 className="type-display-2xl text-ink-950">Curriculum overview</h2>
+              <div className="curriculum-list">
                 {(course.sections ?? []).map((section) => (
                   <article key={section.id} className="curriculum-card">
                     <div className="space-y-2">
@@ -138,6 +247,73 @@ function CourseDetailPage() {
                 ))}
               </div>
             </div>
+
+            <div className="surface-card space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="type-label text-accent-600">Reviews</p>
+                  <h3 className="type-title-lg text-ink-950">Learner feedback</h3>
+                </div>
+                <p className="type-body-sm text-ink-700">
+                  Rating: <strong>{course.rating || 0}</strong> / 5 ({reviewsTotal} review{reviewsTotal === 1 ? '' : 's'})
+                </p>
+              </div>
+
+              {!isAdmin && token ? (
+                <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSubmitReview}>
+                  <select
+                    className="field-select"
+                    value={reviewRating}
+                    onChange={(event) => setReviewRating(Number(event.target.value))}
+                  >
+                    <option value={5}>5 stars</option>
+                    <option value={4}>4 stars</option>
+                    <option value={3}>3 stars</option>
+                    <option value={2}>2 stars</option>
+                    <option value={1}>1 star</option>
+                  </select>
+                  <textarea
+                    className="field-textarea md:col-span-2"
+                    rows={3}
+                    placeholder="Share your learning experience"
+                    value={reviewComment}
+                    onChange={(event) => setReviewComment(event.target.value)}
+                  />
+                  <button className="btn-primary justify-center" type="submit" disabled={reviewSubmitting}>
+                    {reviewSubmitting ? 'Saving...' : 'Save review'}
+                  </button>
+                </form>
+              ) : null}
+
+              <FeedbackMessage type="error">{reviewError}</FeedbackMessage>
+              <FeedbackMessage type="success">{reviewMessage}</FeedbackMessage>
+
+              {reviews.length > 0 ? (
+                <div className="space-y-3">
+                  {reviews.map((review) => (
+                    <article key={review.id} className="curriculum-card space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="type-title-sm text-ink-950">{review.userName}</p>
+                          <p className="type-caption text-ink-500">{new Date(review.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="pill-accent">{review.rating} / 5</span>
+                          {canManageReview(review) ? (
+                            <button className="text-link" type="button" onClick={() => handleDeleteReview(review.id)}>
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      {review.comment ? <p className="type-body-sm text-ink-700">{review.comment}</p> : null}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-panel">No reviews yet. Be the first learner to leave feedback.</div>
+              )}
+            </div>
           </div>
 
           <aside className="surface-panel detail-side-panel">
@@ -157,8 +333,16 @@ function CourseDetailPage() {
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-3">
-                    <button className="btn-primary" type="button" onClick={handleBuyNow}>Buy now</button>
-                    <button className="btn-ghost" type="button" onClick={handleAddToCart}>Add to checkout</button>
+                    {hasLearningAccess ? (
+                      <Link className="btn-primary no-underline" to={`/learn/${course.slug}`}>
+                        Study now
+                      </Link>
+                    ) : (
+                      <>
+                        <button className="btn-primary" type="button" onClick={handleBuyNow}>Buy now</button>
+                        <button className="btn-ghost" type="button" onClick={handleAddToCart}>Add to checkout</button>
+                      </>
+                    )}
                   </div>
                 )}
                 <div className="stack-list">
@@ -166,7 +350,7 @@ function CourseDetailPage() {
                   <li><span className="list-dot" /><span>Category: {course.category || 'General'}</span></li>
                   <li><span className="list-dot" /><span>Original price: {course.originalPrice ? formatPrice(course.originalPrice) : 'No discount'}</span></li>
                 </div>
-                {!isAdmin && token ? <Link className="text-link" to={`/learn/${course.slug}`}>Open learning player</Link> : null}
+                {!isAdmin && token && hasLearningAccess ? <Link className="text-link" to={`/learn/${course.slug}`}>Open learning player</Link> : null}
               </div>
             ) : null}
 

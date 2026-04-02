@@ -6,8 +6,9 @@ export async function getFeaturedCoursesRequest() {
 }
 
 export async function getCourseCategoriesRequest() {
-  const response = await apiClient.get('/api/courses/categories')
-  return unwrapData(response)
+  const response = await apiClient.get('/api/categories')
+  const categories = unwrapData(response)
+  return Array.isArray(categories) ? categories.map((item) => item.name).filter(Boolean) : []
 }
 
 export async function getCoursesRequest(params) {

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { addCartItemRequest, clearCartRequest, getMyCartRequest, removeCartItemRequest } from '../api/cart'
 
 const CART_KEY = 'edulearn_cart'
 
@@ -23,27 +24,85 @@ function persistCart(items) {
   window.localStorage.setItem(CART_KEY, JSON.stringify(items))
 }
 
+function mapCartItems(cart) {
+  const items = Array.isArray(cart?.items) ? cart.items : []
+
+  return items.map((item) => ({
+    id: item.courseId,
+    title: item.title,
+    price: Number(item.price ?? 0),
+    thumbnail: item.thumbnail || null,
+  }))
+}
+
 export const useCartStore = create((set, get) => ({
   items: getStoredCart(),
-  addCourse(course) {
+  totalAmount: getStoredCart().reduce((sum, item) => sum + Number(item.price ?? 0), 0),
+  loading: false,
+  async syncCart(token) {
+    if (!token) {
+      const localItems = getStoredCart()
+      set({ items: localItems, totalAmount: localItems.reduce((sum, item) => sum + Number(item.price ?? 0), 0), loading: false })
+      return
+    }
+
+    set({ loading: true })
+    try {
+      const cart = await getMyCartRequest()
+      const items = mapCartItems(cart)
+      persistCart(items)
+      set({
+        items,
+        totalAmount: Number(cart?.totalAmount ?? 0),
+        loading: false,
+      })
+    } catch (error) {
+      set({ loading: false })
+      throw error
+    }
+  },
+  async addCourse(course, token) {
     const items = get().items
     const exists = items.some((item) => item.id === course.id)
-    if (exists) {
+    if (exists && !token) {
       return false
+    }
+
+    if (token) {
+      const cart = await addCartItemRequest(course.id)
+      const nextItems = mapCartItems(cart)
+      persistCart(nextItems)
+      set({ items: nextItems, totalAmount: Number(cart?.totalAmount ?? 0) })
+      return !exists
     }
 
     const nextItems = [...items, course]
     persistCart(nextItems)
-    set({ items: nextItems })
+    set({ items: nextItems, totalAmount: nextItems.reduce((sum, item) => sum + Number(item.price ?? 0), 0) })
     return true
   },
-  removeCourse(courseId) {
+  async removeCourse(courseId, token) {
+    if (token) {
+      const cart = await removeCartItemRequest(courseId)
+      const items = mapCartItems(cart)
+      persistCart(items)
+      set({ items, totalAmount: Number(cart?.totalAmount ?? 0) })
+      return
+    }
+
     const nextItems = get().items.filter((item) => item.id !== courseId)
     persistCart(nextItems)
-    set({ items: nextItems })
+    set({ items: nextItems, totalAmount: nextItems.reduce((sum, item) => sum + Number(item.price ?? 0), 0) })
   },
-  clearCart() {
+  async clearCart(token) {
+    if (token) {
+      const cart = await clearCartRequest()
+      persistCart([])
+      set({ items: [], totalAmount: Number(cart?.totalAmount ?? 0) })
+      return
+    }
+
     persistCart([])
-    set({ items: [] })
+    set({ items: [], totalAmount: 0 })
   },
 }))

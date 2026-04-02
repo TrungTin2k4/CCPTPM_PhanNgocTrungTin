@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
 
 function CheckoutPage() {
+  const token = useAuthStore((state) => state.token)
   const user = useAuthStore((state) => state.user)
   const items = useCartStore((state) => state.items)
   const removeCourse = useCartStore((state) => state.removeCourse)
@@ -47,11 +48,19 @@ function CheckoutPage() {
 
       setLastOrder(order)
       setSuccessMessage('Order created successfully. The new order is currently in PENDING status.')
-      clearCart()
+      await clearCart(token)
     } catch (error) {
       setErrorMessage(error.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleRemoveCourse(courseId) {
+    try {
+      await removeCourse(courseId, token)
+    } catch (error) {
+      setErrorMessage(error.message)
     }
   }
 
@@ -91,7 +100,7 @@ function CheckoutPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="type-title-sm text-ink-950">{formatPrice(item.price)}</span>
-                      <button className="text-link" type="button" onClick={() => removeCourse(item.id)}>
+                      <button className="text-link" type="button" onClick={() => handleRemoveCourse(item.id)}>
                         Remove
                       </button>
                     </div>

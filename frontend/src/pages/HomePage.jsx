@@ -4,8 +4,8 @@ import { getCourseCategoriesRequest, getFeaturedCoursesRequest } from '../api/co
 import CourseCard from '../components/common/CourseCard.jsx'
 import FeedbackMessage from '../components/common/FeedbackMessage.jsx'
 import Icon from '../components/common/Icon.jsx'
-import { homeFeatures, homeTests } from '../data/content'
 import { buildCourseCardModel, formatPrice } from '../lib/courseUi'
+import { resolveMediaUrl } from '../lib/mediaUrl'
 import { useAuthStore } from '../store/authStore'
 
 const trustedBrands = ['Samsung', 'Cisco', 'Vimeo', 'P&G', 'HPE', 'Citi']
@@ -49,7 +49,7 @@ function HomePage() {
 
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % featuredCourses.length)
-    }, 4200)
+    }, 5000)
 
     return () => window.clearInterval(timer)
   }, [featuredCourses.length])
@@ -65,15 +65,14 @@ function HomePage() {
     [featuredCourses],
   )
 
-  const activeCourse = featuredCourses[activeIndex] ?? null
-  const activeCard = activeCourse
-    ? buildCourseCardModel(activeCourse, {
-        tone: ['brand', 'accent', 'ink'][activeIndex % 3],
-        tag: activeCourse.category || 'Featured',
-        stats: `${activeCourse.duration || 0} min / ${(activeCourse.reviewsCount ?? 0) || 0} reviews`,
-      })
-    : null
+  const tabs = useMemo(() => ['All', ...categories.slice(0, 7)], [categories])
 
+  const visibleCourseCards = useMemo(() => {
+    const source = activeTab === 'All' ? courseCards : courseCards.filter((course) => course.tag === activeTab)
+    return source.slice(0, 8)
+  }, [activeTab, courseCards])
+
+  const activeCourse = featuredCourses[activeIndex] ?? null
   const isAdmin = user?.role === 'ADMIN'
   const heroHref = activeCourse
     ? isAdmin
@@ -81,238 +80,170 @@ function HomePage() {
       : `/courses/${activeCourse.slug}`
     : '/courses'
 
-  const tabs = useMemo(() => ['All', ...categories.slice(0, 5)], [categories])
-
-  const visibleCourseCards = useMemo(() => {
-    const source = activeTab === 'All' ? courseCards : courseCards.filter((course) => course.tag === activeTab)
-    return source.slice(0, 4)
-  }, [activeTab, courseCards])
-
-  const spotlightCards = homeFeatures.slice(0, 3)
-  const darkPromoCards = homeFeatures.slice(3, 6)
-
   return (
-    <div className="space-y-16 lg:space-y-20">
-      <section className="home-hero-shell">
-        <div className="home-hero-grid">
-          <div className="home-hero-copy-block">
-            <div className="home-hero-copy-card">
-              <span className="home-hero-kicker">Today only</span>
-              <h1 className="type-display-3xl text-ink-950">Save 25% on useful courses built for modern careers.</h1>
-              <p className="type-body-lg text-ink-700">
-                Learn with affordable pricing, practical topics, and a cleaner visual flow from the very first section.
+    <div className="space-y-12 lg:space-y-16">
+      <section className="overflow-hidden rounded-2xl border border-[#d8d1eb] bg-gradient-to-r from-[#7d31ff] via-[#8d55ff] to-[#b36cff] text-white shadow-[0_24px_70px_rgba(73,35,149,0.35)]">
+        <div className="grid gap-8 p-6 md:p-10 lg:grid-cols-[1.05fr,1fr] lg:gap-10">
+          <div className="space-y-6">
+            <div className="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]">
+              Last day offer
+            </div>
+            <div className="max-w-[34rem] space-y-4 rounded-2xl bg-white p-6 text-[#1f1b3d] shadow-xl md:p-7">
+              <h1 className="type-display-2xl">Skills fitness starts from {formatPrice(activeCourse?.price || 339000)}</h1>
+              <p className="type-body-md text-ink-700">
+                Get career-ready with in-demand courses, practical projects, and a cleaner learning flow inspired by modern marketplaces.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Link className="btn-primary no-underline" to={heroHref}>
-                  {isAdmin ? 'Edit featured course' : 'View details'}
+                <Link className="inline-flex rounded-lg bg-[#2f1c6a] px-4 py-2.5 text-sm font-semibold text-white no-underline" to={heroHref}>
+                  {isAdmin ? 'Edit featured course' : 'Start learning'}
                 </Link>
-                <Link className="btn-secondary no-underline" to="/courses">
-                  Explore courses
+                <Link className="inline-flex rounded-lg border border-[#2f1c6a] px-4 py-2.5 text-sm font-semibold text-[#2f1c6a] no-underline" to="/courses">
+                  Browse all courses
                 </Link>
               </div>
             </div>
-
-            <div className="home-hero-meta-row">
-              <div className="stat-item">
-                <p className="type-caption text-ink-500">Offer</p>
-                <p className="type-title-sm text-ink-950">25% off today</p>
-              </div>
-              <div className="stat-item">
-                <p className="type-caption text-ink-500">Categories</p>
-                <p className="type-title-sm text-ink-950">{Math.max(categories.length, 5)} areas</p>
-              </div>
-              <div className="stat-item">
-                <p className="type-caption text-ink-500">Featured picks</p>
-                <p className="type-title-sm text-ink-950">{featuredCourses.length || 0} courses</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="home-hero-visual-shell">
-            <div className="home-hero-image-stage">
-              <div className="home-hero-price-badge">25% OFF</div>
-              <div className="home-hero-tag home-hero-tag-left">
-                <Icon name="catalog" className="h-4 w-4" />
-                <span>{activeCourse?.category || 'Popular pick'}</span>
-              </div>
-              <div className="home-hero-tag home-hero-tag-right">
-                <span>{featuredCourses.length > 0 ? `${activeIndex + 1} / ${featuredCourses.length}` : 'Top course'}</span>
-              </div>
-              {activeCard?.thumbnail ? (
-                <div
-                  className="home-hero-photo"
-                  style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(19, 24, 39, 0.08), rgba(19, 24, 39, 0.22)), url(${activeCard.thumbnail})`,
-                  }}
-                />
-              ) : (
-                <div className={`home-hero-orb home-hero-orb-${activeCard?.tone || 'brand'}`} />
-              )}
-              <div className="home-hero-course-card">
-                <p className="type-label text-brand-600">Featured now</p>
-                <h2 className="type-title-lg text-ink-950">{activeCourse?.title || 'Practical course spotlight'}</h2>
-                <p className="type-body-sm text-ink-700">
-                  {activeCourse
-                    ? `${activeCourse.instructor || 'EduLearn Team'} / ${formatPrice(activeCourse.price)} / ${activeCourse.category || 'Course'}`
-                    : 'Clean design, clear pricing, and practical content for everyday learning.'}
-                </p>
-                <div className="hero-carousel-dots">
-                  {featuredCourses.map((course, index) => (
-                    <button
-                      key={course.id}
-                      className={index === activeIndex ? 'hero-carousel-dot hero-carousel-dot-active' : 'hero-carousel-dot'}
-                      type="button"
-                      onClick={() => setActiveIndex(index)}
-                      aria-label={`Show ${course.title}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="home-flow-section">
-        <div className="home-editorial-grid">
-          <div className="home-editorial-copy">
-            <p className="type-label text-brand-600">Learn more</p>
-            <h2 className="type-display-2xl text-ink-950">Practical topics, simple pricing, and a modern learning experience.</h2>
-            <p className="type-body-lg text-ink-700">
-              Every section keeps the same visual rhythm, while each block changes layout just enough to stay fresh and easy to browse.
+            <p className="type-body-sm text-white/90">
+              Ends soon. Build serious skills with affordable learning paths and guided lessons.
             </p>
           </div>
 
-          <div className="home-editorial-card-grid">
-            {spotlightCards.map((item, index) => (
-              <article key={item.title} className="home-promo-card">
-                <div className={`home-promo-thumb home-promo-thumb-${['brand', 'accent', 'ink'][index % 3]}`}>
-                  <div className="home-promo-icon-wrap">
-                    <Icon name={item.icon} className="h-5 w-5" />
-                  </div>
-                </div>
-                <div className="home-promo-content">
-                  <h3 className="type-title-lg text-ink-950">{item.title}</h3>
-                  <p className="type-body-sm text-ink-700">{item.description}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="home-flow-section">
-        <div className="space-y-6">
-          <div className="home-section-head">
-            <div className="space-y-3">
-              <p className="type-label text-brand-600">Trending courses</p>
-              <h2 className="type-display-2xl text-ink-950">Browse useful courses by category</h2>
-              <p className="type-body-lg text-ink-700">
-                Switch between tags to discover in-demand lessons with the same clean marketplace-style cards.
+          <div className="relative min-h-[15rem] overflow-hidden rounded-2xl border border-white/25 bg-[#b58fff]/35">
+            {activeCourse?.thumbnail ? (
+              <img
+                alt={activeCourse.title}
+                className="h-full w-full object-cover"
+                src={resolveMediaUrl(activeCourse.thumbnail)}
+              />
+            ) : (
+              <div className="h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.45),transparent_35%),radial-gradient(circle_at_70%_80%,rgba(255,255,255,0.35),transparent_35%)]" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0f1022]/85 via-[#0f1022]/30 to-transparent" />
+            <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-white/20 bg-[#12162b]/82 p-4 text-white backdrop-blur-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#c4b7ff]">Featured now</p>
+              <h2 className="mt-1 text-2xl font-extrabold leading-tight text-white drop-shadow-sm">{activeCourse?.title || 'Practical course spotlight'}</h2>
+              <p className="mt-1 text-sm text-white/85">
+                {activeCourse
+                  ? `${activeCourse.instructor || 'EduLearn Team'} - ${activeCourse.category || 'Course'}`
+                  : 'Browse practical lessons and real-world projects.'}
               </p>
             </div>
-            <Link className="home-inline-link" to="/courses">
-              Show all courses
-            </Link>
-          </div>
-
-          <div className="home-tab-row">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                className={tab === activeTab ? 'home-tab home-tab-active' : 'home-tab'}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          <FeedbackMessage type="error">{errorMessage}</FeedbackMessage>
-          {loading ? <div className="loading-panel">Loading featured courses...</div> : null}
-
-          {!loading && !errorMessage ? (
-            <div className="home-course-grid">
-              {visibleCourseCards.length > 0 ? (
-                visibleCourseCards.map((course) => <CourseCard key={course.id} course={course} />)
-              ) : (
-                <div className="empty-panel">No featured courses match this category yet.</div>
-              )}
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="home-dark-promo-shell">
-        <div className="home-dark-promo-grid">
-          <div className="home-dark-copy">
-            <p className="type-label text-brand-600">Premium focus</p>
-            <h2 className="type-display-2xl text-white">A strong visual break that still keeps the page layout consistent.</h2>
-            <p className="type-body-lg text-white/80">
-              Use this darker section to highlight premium value, top career outcomes, and the most useful product benefits.
-            </p>
-            <Link className="home-dark-link" to="/courses">
-              Browse all featured courses
-            </Link>
-          </div>
-
-          <div className="home-dark-card-grid">
-            {darkPromoCards.map((item, index) => (
-              <article key={item.title} className="home-dark-card">
-                <div className={`home-dark-card-thumb home-dark-card-thumb-${['brand', 'accent', 'ink'][index % 3]}`}>
-                  <Icon name={item.icon} className="h-5 w-5" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="type-title-sm text-white">{item.title}</h3>
-                  <p className="type-body-sm text-white/70">{item.actions.join(' / ')}</p>
-                </div>
-              </article>
-            ))}
           </div>
         </div>
       </section>
 
-      <section className="home-trust-strip">
-        <p className="type-body-lg text-ink-700">Trusted by learners who want practical, modern, and affordable skills.</p>
-        <div className="home-logo-row">
-          {trustedBrands.map((brand) => (
-            <span key={brand} className="home-logo-chip">
-              {brand}
-            </span>
+      <section className="space-y-5">
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#6b56bd]">Top picks for you</p>
+          <h2 className="type-display-2xl text-ink-950">All the skills you need in one place</h2>
+          <p className="type-body-md text-ink-700">From critical skills to technical topics, discover what to learn next.</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 border-b border-line pb-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              className={
+                tab === activeTab
+                  ? 'rounded-full bg-[#2f1c6a] px-4 py-2 text-sm font-bold text-white shadow-sm'
+                  : 'rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:border-[#7c5ef3] hover:text-[#2f1c6a]'
+              }
+              type="button"
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
           ))}
         </div>
+
+        <FeedbackMessage type="error">{errorMessage}</FeedbackMessage>
+        {loading ? <div className="loading-panel">Loading featured courses...</div> : null}
+
+        {!loading && !errorMessage ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {visibleCourseCards.length > 0 ? (
+              visibleCourseCards.map((course) => <CourseCard key={course.id} course={course} />)
+            ) : (
+              <div className="empty-panel">No featured courses match this category yet.</div>
+            )}
+          </div>
+        ) : null}
       </section>
 
-      <section className="home-flow-section">
-        <div className="space-y-6">
+      <section className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="type-body-md text-ink-700">Trusted by teams and learners at</p>
+          <div className="flex flex-wrap gap-3">
+            {trustedBrands.map((brand) => (
+              <span key={brand} className="rounded-full bg-[#f5f4fb] px-4 py-2 text-sm font-semibold text-[#5d5577]">
+                {brand}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+          <p className="type-label text-brand-600">For learners</p>
+          <h3 className="mt-2 text-2xl font-bold text-ink-950">Learn with practical outcomes</h3>
+          <p className="mt-2 type-body-sm text-ink-700">Follow clear sections, track progress, and jump back into your learning instantly.</p>
+          <Link className="mt-4 inline-flex text-sm font-semibold text-[#5d2abf] no-underline" to="/my-learning">
+            Go to my learning
+          </Link>
+        </article>
+
+        <article className="rounded-2xl border border-[#d8d1eb] bg-gradient-to-r from-[#f8f2ff] to-[#edf2ff] p-6 shadow-sm">
+          <p className="type-label text-brand-600">For teams</p>
+          <h3 className="mt-2 text-2xl font-bold text-ink-950">Upskill your team with role-based paths</h3>
+          <p className="mt-2 type-body-sm text-ink-700">Curate courses by category and keep each learner focused on practical outcomes.</p>
+          <Link className="mt-4 inline-flex text-sm font-semibold text-[#5d2abf] no-underline" to="/courses">
+            Explore business-ready courses
+          </Link>
+        </article>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-white p-6 shadow-sm md:p-8">
+        <div className="grid gap-6 lg:grid-cols-[1.2fr,1fr] lg:items-start">
           <div className="space-y-3">
             <p className="type-label text-brand-600">Contact</p>
-            <h2 className="type-display-2xl text-ink-950">You can contact me through these channels</h2>
-            <p className="type-body-lg text-ink-700">
-              Reach out through social, direct call, business email, or LinkedIn whenever you want to talk about courses or collaboration.
+            <h3 className="type-display-2xl text-ink-950">Need support or want to collaborate?</h3>
+            <p className="type-body-md text-ink-700">
+              Reach out for course support, partnership discussions, or platform feedback. We reply quickly during business hours.
             </p>
           </div>
 
-          <div className="home-contact-grid">
-            {homeTests.map((item) => (
-              <article key={item.title} className="home-contact-card">
-                <div className="feature-icon-wrap feature-icon-soft">
-                  <Icon name={item.icon} className="h-5 w-5" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="type-title-sm text-ink-950">{item.title}</h3>
-                  <div className="stack-list">
-                    {item.bullets.map((bullet) => (
-                      <li key={bullet}>
-                        <span className="list-dot" />
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </div>
-                </div>
-              </article>
-            ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a className="rounded-xl border border-line bg-[#faf9ff] p-4 no-underline transition hover:shadow-md" href="mailto:support@edulearn.local">
+              <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#ece8ff] text-[#5d2abf]">
+                <Icon name="mail" className="h-4 w-4" />
+              </div>
+              <p className="text-sm font-semibold text-ink-950">Email support</p>
+              <p className="mt-1 text-sm text-ink-600">support@edulearn.local</p>
+            </a>
+
+            <a className="rounded-xl border border-line bg-[#faf9ff] p-4 no-underline transition hover:shadow-md" href="tel:+84000000000">
+              <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#ece8ff] text-[#5d2abf]">
+                <Icon name="phone" className="h-4 w-4" />
+              </div>
+              <p className="text-sm font-semibold text-ink-950">Hotline</p>
+              <p className="mt-1 text-sm text-ink-600">(+84) 000 000 000</p>
+            </a>
+
+            <a className="rounded-xl border border-line bg-[#faf9ff] p-4 no-underline transition hover:shadow-md" href="https://linkedin.com" target="_blank" rel="noreferrer">
+              <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#ece8ff] text-[#5d2abf]">
+                <Icon name="linkedin" className="h-4 w-4" />
+              </div>
+              <p className="text-sm font-semibold text-ink-950">LinkedIn</p>
+              <p className="mt-1 text-sm text-ink-600">EduLearn team updates</p>
+            </a>
+
+            <a className="rounded-xl border border-line bg-[#faf9ff] p-4 no-underline transition hover:shadow-md" href="https://facebook.com" target="_blank" rel="noreferrer">
+              <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#ece8ff] text-[#5d2abf]">
+                <Icon name="facebook" className="h-4 w-4" />
+              </div>
+              <p className="text-sm font-semibold text-ink-950">Community</p>
+              <p className="mt-1 text-sm text-ink-600">Join our learner group</p>
+            </a>
           </div>
         </div>
       </section>

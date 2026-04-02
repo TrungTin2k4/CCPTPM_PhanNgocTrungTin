@@ -39,3 +39,18 @@ export async function changePasswordRequest(payload) {
   const response = await apiClient.put('/api/auth/change-password', payload)
   return unwrapData(response)
 }
+
+export async function getMySessionsRequest(params) {
+  const response = await apiClient.get('/api/auth/sessions', { params })
+  return unwrapData(response)
+}
+
+export async function revokeAllSessionsRequest() {
+  const response = await apiClient.delete('/api/auth/sessions')
+  return unwrapData(response)
+}
+
+export async function revokeSessionRequest(id) {
+  const response = await apiClient.delete(`/api/auth/sessions/${id}`)
+  return unwrapData(response)
+}
