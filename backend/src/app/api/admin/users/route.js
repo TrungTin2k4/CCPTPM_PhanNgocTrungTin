@@ -16,3 +16,5 @@ export async function GET(request) {
         return ok(request, data);
     });
 }
+
+// Updated for JIRA P321-33
