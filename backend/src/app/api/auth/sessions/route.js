@@ -29,3 +29,5 @@ export async function DELETE(request) {
         return ok(request, null, "All sessions revoked successfully");
     });
 }
+
+// Updated for JIRA P321-32
