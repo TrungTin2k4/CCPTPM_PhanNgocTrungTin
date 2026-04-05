@@ -93,3 +93,5 @@ export async function requireAdmin(request) {
     }
     return user;
 }
+
+// Updated for JIRA P321-34
